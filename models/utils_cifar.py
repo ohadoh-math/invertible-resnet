@@ -1,4 +1,5 @@
 import torch
+import logging
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils
@@ -90,33 +91,47 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
         lr = args.lr
 
     params = sum([np.prod(p.size()) for p in model.parameters()])
-    print('|  Number of Trainable Parameters: ' + str(params))
-    print('\n=> Training Epoch #%d, LR=%.4f' % (epoch, lr))
+    logging.info('|  Number of Trainable Parameters: ' + str(params))
+    logging.info('=> Training Epoch #%d, LR=%.4f' % (epoch, lr))
           
     for batch_idx, (inputs, targets) in enumerate(trainloader):
+        logging.info("epoch = %d, batch index = %d/%d", epoch, batch_idx, len(trainloader)) 
         cur_iter = (epoch - 1) * len(trainloader) + batch_idx
+        #logging.debug("debug marker")
         # if first epoch use warmup
         if epoch - 1 <= args.warmup_epochs:
             this_lr = args.lr * float(cur_iter) / (args.warmup_epochs * len(trainloader))
             update_lr(optimizer, this_lr)
 
+        #logging.debug("debug marker")
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()  # GPU settings
         optimizer.zero_grad()
         
-        inputs, targets = Variable(inputs, requires_grad=True), Variable(targets)
+        #logging.debug("debug marker")
+        #inputs, targets = Variable(inputs, requires_grad=True), Variable(targets)
         
 
+        #logging.debug("debug marker")
         if args.densityEstimation: # density estimation
+            #logging.debug("debug marker")
             _, logpz, trace = model(inputs)  # Forward Propagation
+            #logging.debug("debug marker")
             # compute loss
             logpx = logpz + trace
+            #logging.debug("debug marker")
             loss = bits_per_dim(logpx, inputs).mean()
+            #logging.debug("debug marker")
         else: # classification
+            #logging.debug("debug marker")
             out, _ = model(inputs)
+            #logging.debug("debug marker")
             loss = criterion(out, targets) # Loss
+            #logging.debug("debug marker")
+        #logging.debug("debug marker")
         
         # logging for sigmas. NOTE: needs to be done before backward-call
+        #logging.debug("debug marker")
         if args.densityEstimation and args.log_verbose:
             if batch_idx % args.log_every == 0:
                 sigmas = []
@@ -127,10 +142,13 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
                 sigmas = np.array(sigmas)
                 line_plot(viz, "sigma all layers", cur_iter, sigmas)
                 
+        #logging.debug("debug marker")
         loss.backward()  # Backward Propagation
         optimizer.step()  # Optimizer update
                 
+        #logging.debug("debug marker")
         if args.densityEstimation: # logging for density estimation
+            logging.debug("debug marker")
             if batch_idx % args.log_every == 0:
                 mean_trace = trace.mean().item()
                 mean_logpz = logpz.mean().item()
@@ -179,6 +197,7 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
                         line_plot(viz, "min prior scale", cur_iter, prior_scales_min.item())  
 
         else: # logging for classification
+            #logging.debug("debug marker")
             _, predicted = torch.max(out.data, 1)
             total += targets.size(0)
             correct += predicted.eq(targets.data).cpu().sum()    
@@ -189,6 +208,7 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
                                     (len(trainset)//args.batch)+1, loss.data.item(),
                                     100.*correct.type(torch.FloatTensor)/float(total)))
                 sys.stdout.flush()
+        #logging.debug("debug marker")
 
 
 def test(best_result, args, model, epoch, testloader, viz, use_cuda, test_log):
@@ -243,9 +263,9 @@ def test(best_result, args, model, epoch, testloader, viz, use_cuda, test_log):
 
     objective = float(objective) / float(total)
     line_plot(viz, "test bits/dim" if args.densityEstimation else "test acc", epoch, objective)
-    print("\n| Validation Epoch #%d\t\t\tobjective =  %.4f" % (epoch, objective), flush=True)
+    logging.info("\n| Validation Epoch #%d\t\t\tobjective =  %.4f" % (epoch, objective), flush=True)
     if objective > best_result:
-        print('\n| Saving Best model...\t\t\tobjective = %.4f%%' % (objective), flush=True)
+        logging.info('\n| Saving Best model...\t\t\tobjective = %.4f%%' % (objective), flush=True)
         state = {
             'model': model if use_cuda else model,
             'objective': objective,
@@ -256,7 +276,7 @@ def test(best_result, args, model, epoch, testloader, viz, use_cuda, test_log):
         torch.save(state, os.path.join(args.save_dir, 'checkpoint.t7'))
         best_result = objective
     else:
-        print('\n| Not best... {:.4f} < {:.4f}'.format(objective, best_result), flush=True)
+        logging.info('\n| Not best... {:.4f} < {:.4f}'.format(objective, best_result), flush=True)
 
     # log to file
     test_log.write("{} {}\n".format(epoch, objective))
@@ -335,10 +355,10 @@ def interpolate(model, testloader, testset, epoch, use_cuda, best_acc, dataset, 
     # Save checkpoint when best model
 
     acc = 100.*correct.type(torch.FloatTensor)/float(total)
-    print("\n| Validation Epoch #%d\t\t\tLoss: %.4f Acc@1: %.4f%%" %(epoch, loss.data[0], acc),flush=True)
+    logging.info("\n| Validation Epoch #%d\t\t\tLoss: %.4f Acc@1: %.4f%%" %(epoch, loss.data[0], acc),flush=True)
 
     if acc > best_acc:
-        print('| Saving Best model...\t\t\tTop1 = %.4f%%' % (acc), flush=True)
+        logging.info('| Saving Best model...\t\t\tTop1 = %.4f%%' % (acc), flush=True)
         state = {
                 'model': model if use_cuda else model,
                 'acc': acc,

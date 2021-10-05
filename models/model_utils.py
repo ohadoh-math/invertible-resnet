@@ -5,6 +5,7 @@ ICLR 2018
 """
 
 import torch
+import logging
 import torch.nn as nn
 
 from torch.nn import Parameter
@@ -256,8 +257,8 @@ if __name__ == "__main__":
     out1, _ = AN(x)
     x_re = AN.inverse(out1)
 
-    print((x - x_re).abs().mean())
+    logging.info("%r", (x - x_re).abs().mean())
     out2, _ = AN(x)
     s = torch.transpose(out2, 0, 1).contiguous().view(num_channels, -1).std(dim=1)
     m = torch.transpose(out2, 0, 1).contiguous().view(num_channels, -1).mean(dim=1)
-    print(s, m)
+    logging.info("%r", s, m)

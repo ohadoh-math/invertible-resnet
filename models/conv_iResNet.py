@@ -5,6 +5,7 @@ ICML, 2019
 """
 
 import numpy as np
+import logging
 import torch
 import torch.nn as nn
 import torch.distributions as distributions
@@ -436,8 +437,8 @@ class conv_iResNet(nn.Module):
         self.numSeriesTerms = numSeriesTerms if density_estimation else 0
         self.n_power_iter = n_power_iter
 
-        print('')
-        print(' == Building iResNet %d == ' % (sum(nBlocks) * 3 + 1))
+        logging.info('')
+        logging.info(' == Building iResNet %d == ' % (sum(nBlocks) * 3 + 1))
         self.init_squeeze = Squeeze(self.init_ds)
         self.inj_pad = injective_pad(inj_pad)
         if self.init_ds == 2:
@@ -511,8 +512,8 @@ class conv_iResNet(nn.Module):
                   and not "weight_u" in v
                   and not "bn1" in v
                   and not "linear" in v]
-        print(len(params))
-        print(len(self.in_shapes))
+        logging.info("%r", len(params))
+        logging.info("%r", len(self.in_shapes))
         svs = [] 
         for param in params:
           input_shape = tuple(self.in_shapes[j])
@@ -527,7 +528,7 @@ class conv_iResNet(nn.Module):
           t_fft_coeff = np.transpose(fft_coeff)
           D = np.linalg.svd(t_fft_coeff, compute_uv=False, full_matrices=False)
           Dflat = np.sort(D.flatten())[::-1] 
-          print("Layer "+str(j)+" Singular Value "+str(Dflat[0]))
+          logging.info("Layer "+str(j)+" Singular Value "+str(Dflat[0]))
           svs.append(Dflat[0])
           if i == 2:
             i = 0
@@ -604,7 +605,7 @@ if __name__ == "__main__":
     logistic_2 = distributions.TransformedDistribution(base_distribution, transforms_2)
 
     x = torch.zeros(2)
-    print(logistic_1.log_prob(x), logistic_2.log_prob(x))
+    logging.info("%r", logistic_1.log_prob(x), logistic_2.log_prob(x))
     1/0
 
     diff = lambda x, y: (x - y).abs().sum()
@@ -616,40 +617,40 @@ if __name__ == "__main__":
 
     block = conv_iresnet_block(in_shape[1:], 32, stride=1, actnorm=True)
     out, tr = block(x)#, ignore_logdet=True)
-    print("block")
+    logging.info("block")
     for i in range(10):
         x_re = block.inverse(out, i)
-        print(i, diff(x, x_re))
+        logging.info("%r", i, diff(x, x_re))
 
     steps = 4
     int_dim = 32
     sb = scale_block(steps, in_shape[1:], int_dim, True, 5, 1, True, .9, False, True, True)
 
     [z1, z2], tr = sb(x)#, ignore_logdet=True)
-    print("scale block")
+    logging.info("scale block")
     for i in range(1):
         x_re = sb.inverse(z1, z2, i)
-        print(i, diff(x, x_re))
+        logging.info("%r", i, diff(x, x_re))
 
     resnet = conv_iResNet(in_shape[1:], [4, 4, 4], [1, 2, 2], [32, 32, 32],
                           init_ds=2, density_estimation=True, actnorm=True)
-    print(resnet.final_shape)
+    logging.info("%r", resnet.final_shape)
     z, lpz, tr = resnet(x)#, ignore_logdet=True)
     for i in range(1):
         x_re = resnet.inverse(z, i)
-        print("{} iters error {}".format(i, (x - x_re).abs().sum()))
+        logging.info("{} iters error {}".format(i, (x - x_re).abs().sum()))
 
     resnet = multiscale_conv_iResNet(in_shape[1:], [4, 4, 4], [1, 2, 2], [32, 32, 32],
                                      True, 0, .9, True, None, True, 1, 5, True)
     out, logpz, tr = resnet(x)#, ignore_logdet=True)
-    print(logpz)
-    print(tr)
-    print([o.size() for o in out])
-    print(resnet.z_shapes())
+    logging.info("%r", logpz)
+    logging.info("%r", tr)
+    logging.info("%r", [o.size() for o in out])
+    logging.info("%r", resnet.z_shapes())
     sample = resnet.sample(33)
-    print(sample.size())
-    print('multiscale')
+    logging.info("%r", sample.size())
+    logging.info('multiscale')
     for i in range(20):
         x_re = resnet.inverse(out, i)
-        print(i, diff(x, x_re))
+        logging.info("%r", i, diff(x, x_re))
 

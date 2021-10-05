@@ -4,7 +4,11 @@ Based on: Regularisation of Neural Networks by Enforcing Lipschitz Continuity
     (Gouk et al. 2018)
     https://arxiv.org/abs/1804.04368
 """
+import sys
 import torch
+import logging
+import h5py
+from save_data import save_data
 from torch.nn.functional import normalize, conv_transpose2d, conv2d
 from torch.nn.parameter import Parameter
 from torch.nn import ConvTranspose2d
@@ -74,8 +78,23 @@ class SpectralNormConv(object):
         if do_power_iteration:
             with torch.no_grad():
                 for _ in range(self.n_power_iterations):
-                    v_s = conv_transpose2d(u.view(self.out_shape), weight, stride=stride,
-                                         padding=padding, output_padding=0)
+                    #u.view(self.out_shape)
+                    #logging.info("input type = %r, weight type = %r", type(u), type(weight))
+                    #logging.info("input shape = %r, weight shape = %r", self.out_shape, weight.shape)
+                    #logging.info("devices=%r", [getattr(x, 'device', None) for x in [u, weight,]])
+                    #logging.info("padding = %r, stride = %r", padding, stride)
+                    try:
+                        v_s = conv_transpose2d(u.view(self.out_shape), weight, stride=stride, padding=padding, output_padding=0)
+                    except Exception:
+                        logging.error("error on convolution", exc_info=True)
+                        save_data(
+                            u=u,
+                            weight=weight,
+                            stride=stride,
+                            padding=padding,
+                            out_shape=list(self.out_shape),
+                        )
+                        raise
                     # Note: out flag for in-place changes
                     v = normalize(v_s.view(-1), dim=0, eps=self.eps, out=v)
                     

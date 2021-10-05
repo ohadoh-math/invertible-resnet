@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import logging
 import torch.nn.functional as F
 import torch.nn.utils.weight_norm as wn
 from torch.nn.modules.batchnorm import _BatchNorm
@@ -29,16 +30,16 @@ def save_session(model, optim, args, epoch):
     # save the model and optimizer state
     torch.save(model.state_dict(), os.path.join(path, 'model.pth'))
     torch.save(optim.state_dict(), os.path.join(path, 'optim.pth'))
-    print('Successfully saved model')
+    logging.info('Successfully saved model')
 
 def load_session(model, optim, args):
     try: 
         start_epoch = int(args.load_dir.split('/')[-1])
         model.load_state_dict(torch.load(os.path.join(args.load_dir, 'model.pth')))
         optim.load_state_dict(torch.load(os.path.join(args.load_dir, 'optim.pth')))
-        print('Successfully loaded model')
+        logging.info('Successfully loaded model')
     except Exception as e:
-        print('Could not restore session properly')
+        logging.info('Could not restore session properly')
 
     return model, optim, start_epoch
 

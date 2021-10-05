@@ -5,6 +5,7 @@ ICML, 2019
 """
 
 import numpy as np
+import logging
 import torch
 from scipy.linalg import logm
 from torch.autograd.gradcheck import zero_gradients
@@ -131,4 +132,4 @@ def weak_bound(sigma, d, n_terms):
 
 
 if __name__ == "__main__":
-    print() 
+    logging.info("") 

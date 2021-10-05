@@ -5,6 +5,7 @@ Adpated from:
 Spectral Normalization from https://arxiv.org/abs/1802.05957
 """
 import torch
+import logging
 from torch.nn.functional import normalize
 from torch.nn.parameter import Parameter
 

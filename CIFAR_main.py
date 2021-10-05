@@ -4,10 +4,14 @@ http://proceedings.mlr.press/v97/behrmann19a.html
 ICML, 2019
 """
 
+import threading
+import logging
+import contextlib
 import torch
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 from torch.autograd import Variable
+from save_data import save_data, METADATA_DIR
 import numpy as np
 import torchvision
 import torchvision.transforms as transforms
@@ -108,8 +112,8 @@ def test_spec_norm(model, in_shapes, extension):
               and not "weight_u" in v \
               and not "weight_orig" in v \
               and not "bn1" in v and not "linear" in v]
-    print(len(params))
-    print(len(in_shapes))
+    logging.info(len(params))
+    logging.info(len(in_shapes))
     svs = [] 
     for param in params:
       if i == 0:
@@ -124,7 +128,7 @@ def test_spec_norm(model, in_shapes, extension):
       t_fft_coeff = np.transpose(fft_coeff)
       U, D, V = np.linalg.svd(t_fft_coeff, compute_uv=True, full_matrices=False)
       Dflat = np.sort(D.flatten())[::-1] 
-      print("Layer "+str(j)+" Singular Value "+str(Dflat[0]))
+      logging.info("Layer "+str(j)+" Singular Value "+str(Dflat[0]))
       svs.append(Dflat[0])
       if i == 2:
         i = 0
@@ -149,12 +153,96 @@ def get_init_batch(dataloader, batch_size):
     batch = torch.cat(batches)
     return batch
 
+def get_model(
+    multiScale,
+    in_shape,
+    nBlocks,
+    nStrides,
+    nChannels,
+    nClasses,
+    init_ds,
+    inj_pad,
+    coeff,
+    numTraceSamples,
+    numSeriesTerms,
+    powerIterSpectralNorm,
+    densityEstimation,
+    noActnorm,
+    fixedPrior,
+    nonlin,
+):
+    if multiScale:
+        model = multiscale_iResNet(
+            in_shape,
+            nBlocks,
+            nStrides,
+            nChannels,
+            init_ds == 2,
+            inj_pad,
+            coeff,
+            densityEstimation,
+            nClasses,
+            numTraceSamples,
+            numSeriesTerms,
+            powerIterSpectralNorm,
+            actnorm=(not noActnorm),
+            learn_prior=(not fixedPrior),
+            nonlin=nonlin,
+        )
+    else:
+        model = iResNet(
+            nBlocks=nBlocks,
+            nStrides=nStrides,
+            nChannels=nChannels,
+            nClasses=nClasses,
+            init_ds=init_ds,
+            inj_pad=inj_pad,
+            in_shape=in_shape,
+            coeff=coeff,
+            numTraceSamples=numTraceSamples,
+            numSeriesTerms=numSeriesTerms,
+            n_power_iter=powerIterSpectralNorm,
+            density_estimation=densityEstimation,
+            actnorm=(not noActnorm),
+            learn_prior=(not fixedPrior),
+            nonlin=nonlin,
+        )
+    return model
+
+
+def cifar10_classification_model():
+    """
+    CIFAR10 classification
+    """
+    return get_model(
+        False,
+        (3, 32, 32),
+        [7,7,7],
+        [1,2,2],
+        [32,64,128],
+        10,
+        1,
+        13,
+        0.9,
+        1,
+        1,
+        1,
+        False,
+        False,
+        False,
+        "elu",
+    )
+
 
 def main():
     args = parser.parse_args()
+    logging.basicConfig(
+        format="%(asctime)s (pid=%(process)d:tid=%(thread)d) [%(levelname)s:%(funcName)s:%(filename)s:%(lineno)d] %(message)s",
+        level=logging.DEBUG,
+    )
 
     if args.deterministic:
-        print("MODEL NOT FULLY DETERMINISTIC")
+        logging.info("MODEL NOT FULLY DETERMINISTIC")
         torch.manual_seed(1234)
         torch.cuda.manual_seed(1234)
         np.random.seed(1234)
@@ -232,68 +320,70 @@ def main():
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch, shuffle=True, num_workers=2)
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch, shuffle=False, num_workers=2)
 
-    def get_model(args):
-        if args.multiScale:
-            model = multiscale_iResNet(in_shape,
-                                       args.nBlocks, args.nStrides, args.nChannels,
-                                       args.init_ds == 2,
-                                       args.inj_pad, args.coeff, args.densityEstimation,
-                                       args.nClasses, 
-                                       args.numTraceSamples, args.numSeriesTerms,
-                                       args.powerIterSpectralNorm,
-                                       actnorm=(not args.noActnorm),
-                                       learn_prior=(not args.fixedPrior),
-                                       nonlin=args.nonlin)
-        else:
-            model = iResNet(nBlocks=args.nBlocks, nStrides=args.nStrides,
-                            nChannels=args.nChannels, nClasses=args.nClasses,
-                            init_ds=args.init_ds,
-                            inj_pad=args.inj_pad,
-                            in_shape=in_shape,
-                            coeff=args.coeff,
-                            numTraceSamples=args.numTraceSamples,
-                            numSeriesTerms=args.numSeriesTerms,
-                            n_power_iter = args.powerIterSpectralNorm,
-                            density_estimation=args.densityEstimation,
-                            actnorm=(not args.noActnorm),
-                            learn_prior=(not args.fixedPrior),
-                            nonlin=args.nonlin)
-        return model
+    model = get_model(
+        args.multiScale,
+        in_shape,
+        args.nBlocks,
+        args.nStrides,
+        args.nChannels,
+        args.nClasses,
+        args.init_ds,
+        args.inj_pad,
+        args.coeff,
+        args.numTraceSamples,
+        args.numSeriesTerms,
+        args.powerIterSpectralNorm,
+        args.densityEstimation,
+        args.noActnorm,
+        args.fixedPrior,
+        args.nonlin,
+    )
 
-    model = get_model(args)
     # init actnrom parameters
     init_batch = get_init_batch(trainloader, args.init_batch)
-    print("initializing actnorm parameters...")
-    with torch.no_grad():
-        model(init_batch, ignore_logdet=True)
-    print("initialized")
 
+    logging.info("cuda specs")
     use_cuda = torch.cuda.is_available()
     if use_cuda:
         model.cuda()
+        init_batch = init_batch.cuda()
+    else:
+        in_shapes = model.get_in_shapes()
+
+    logging.info("initializing actnorm parameters...")
+    logging.info("batch device = %r", init_batch.device)
+
+    save_data(METADATA_DIR/"init-batch.h5", init_batch=init_batch)
+    with torch.no_grad():
+        with contextlib.suppress(Exception):
+            model(init_batch)
+
+        model(init_batch, ignore_logdet=True)
+
+    if use_cuda:
         model = torch.nn.DataParallel(model, range(torch.cuda.device_count()))
         cudnn.benchmark = True
         in_shapes = model.module.get_in_shapes()
-    else:
-        in_shapes = model.get_in_shapes()
+
+    logging.info("initialized")
 
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
-            print("=> loading checkpoint '{}'".format(args.resume))
+            logging.info("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             start_epoch = checkpoint['epoch']
             best_objective = checkpoint['objective']
-            print('objective: '+str(best_objective))
+            logging.info('objective: '+str(best_objective))
             model = checkpoint['model']
             if use_cuda:
                 model.module.set_num_terms(args.numSeriesTerms)
             else:
                 model.set_num_terms(args.numSeriesTerms)
-            print("=> loaded checkpoint '{}' (epoch {})"
+            logging.info("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
         else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
+            logging.info("=> no checkpoint found at '{}'".format(args.resume))
 
     try_make_dir(args.save_dir)
     if args.analysisTraceEst:
@@ -318,12 +408,13 @@ def main():
         test(best_objective, args, model, start_epoch, testloader, viz, use_cuda, test_log)
         return
 
-    print('|  Train Epochs: ' + str(args.epochs))
-    print('|  Initial Learning Rate: ' + str(args.lr))
+    logging.info('|  Train Epochs: ' + str(args.epochs))
+    logging.info('|  Initial Learning Rate: ' + str(args.lr))
 
     elapsed_time = 0
     test_objective = -np.inf
 
+    logging.info("optimizer = %r", args.optimizer)
     if args.optimizer == "adam":
         optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     elif args.optimizer == "adamax":
@@ -337,21 +428,31 @@ def main():
 
     train_log = open(os.path.join(args.save_dir, "train_log.txt"), 'w')
 
+    logging.info("TRAINING!")
     for epoch in range(1, 1+args.epochs):
         start_time = time.time()
+        logging.debug("start << training epoch %d", epoch)
         train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, train_log)
+        assert False
+        logging.debug("finish >> training epoch %d", epoch)
         epoch_time = time.time() - start_time
         elapsed_time += epoch_time
-        print('| Elapsed time : %d:%02d:%02d' % (get_hms(elapsed_time)))
+        logging.info('| Elapsed time : %d:%02d:%02d' % (get_hms(elapsed_time)))
 
-    print('Testing model')
+    logging.info('Testing model')
     test_log = open(os.path.join(args.save_dir, "test_log.txt"), 'w')
     test_objective = test(test_objective, args, model, epoch, testloader, viz, use_cuda, test_log)
-    print('* Test results : objective = %.2f%%' % (test_objective))
+    logging.info('* Test results : objective = %.2f%%' % (test_objective))
     with open(os.path.join(args.save_dir, 'final.txt'), 'w') as f:
         f.write(str(test_objective))
 
 
 if __name__ == '__main__':
-    main()
+    main_tid = threading.main_thread().ident
+    try:
+        main()
+    except Exception:
+        if threading.main_thread().ident == threading.current_thread().ident:
+            logging.error("critical error", exc_info=True)
+        sys.exit(1) #raise
 
