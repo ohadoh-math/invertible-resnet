@@ -433,7 +433,6 @@ def main():
         start_time = time.time()
         logging.debug("start << training epoch %d", epoch)
         train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, train_log)
-        assert False
         logging.debug("finish >> training epoch %d", epoch)
         epoch_time = time.time() - start_time
         elapsed_time += epoch_time
