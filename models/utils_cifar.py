@@ -263,9 +263,9 @@ def test(best_result, args, model, epoch, testloader, viz, use_cuda, test_log):
 
     objective = float(objective) / float(total)
     line_plot(viz, "test bits/dim" if args.densityEstimation else "test acc", epoch, objective)
-    logging.info("\n| Validation Epoch #%d\t\t\tobjective =  %.4f" % (epoch, objective), flush=True)
+    logging.info("\n| Validation Epoch #%d\t\t\tobjective =  %.4f", epoch, objective)
     if objective > best_result:
-        logging.info('\n| Saving Best model...\t\t\tobjective = %.4f%%' % (objective), flush=True)
+        logging.info('\n| Saving Best model...\t\t\tobjective = %.4f%%', objective)
         state = {
             'model': model if use_cuda else model,
             'objective': objective,
@@ -276,7 +276,7 @@ def test(best_result, args, model, epoch, testloader, viz, use_cuda, test_log):
         torch.save(state, os.path.join(args.save_dir, 'checkpoint.t7'))
         best_result = objective
     else:
-        logging.info('\n| Not best... {:.4f} < {:.4f}'.format(objective, best_result), flush=True)
+        logging.info('\n| Not best... {:.4f} < {:.4f}'.format(objective, best_result))
 
     # log to file
     test_log.write("{} {}\n".format(epoch, objective))
@@ -355,10 +355,10 @@ def interpolate(model, testloader, testset, epoch, use_cuda, best_acc, dataset, 
     # Save checkpoint when best model
 
     acc = 100.*correct.type(torch.FloatTensor)/float(total)
-    logging.info("\n| Validation Epoch #%d\t\t\tLoss: %.4f Acc@1: %.4f%%" %(epoch, loss.data[0], acc),flush=True)
+    logging.info("\n| Validation Epoch #%d\t\t\tLoss: %.4f Acc@1: %.4f%%", epoch, loss.data[0], acc)
 
     if acc > best_acc:
-        logging.info('| Saving Best model...\t\t\tTop1 = %.4f%%' % (acc), flush=True)
+        logging.info('| Saving Best model...\t\t\tTop1 = %.4f%%', acc)
         state = {
                 'model': model if use_cuda else model,
                 'acc': acc,
