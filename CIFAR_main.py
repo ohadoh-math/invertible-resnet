@@ -7,10 +7,13 @@ ICML, 2019
 import threading
 import logging
 import contextlib
+import numpy
 import torch
+import termcolor
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 from torch.autograd import Variable
+from torch.utils.data import Subset
 from save_data import save_data, METADATA_DIR
 import numpy as np
 import torchvision
@@ -75,6 +78,7 @@ parser.add_argument('-log_verbose', '--log_verbose', dest='log_verbose', action=
                     help='verbose logging: sigmas, max gradient')
 parser.add_argument('-deterministic', '--deterministic', dest='deterministic', action='store_true',
                     help='fix random seeds and set cuda deterministic')
+parser.add_argument('--trunc', type=float, default=1., help='Truncate the data and test sets by percentage.')
 
 
 def try_make_dir(d):
@@ -236,6 +240,8 @@ def cifar10_classification_model():
 
 def main():
     args = parser.parse_args()
+    assert 0. < args.trunc, Exception("Can't truncate with negative percentage", args.trunc)
+
     logging.basicConfig(
         format="%(asctime)s (pid=%(process)d:tid=%(thread)d) [%(levelname)s:%(funcName)s:%(filename)s:%(lineno)d] %(message)s",
         level=logging.DEBUG,
@@ -305,6 +311,43 @@ def main():
                 root='./data', split='test', download=True, transform=transform_test)
             args.nClasses = 10
         in_shape = (3, 32, 32)
+
+    if args.trunc < 1:
+        orig_train_len = len(trainset)
+        orig_test_len = len(testset)
+
+        random_train_indices = list(
+            numpy.random.choice(
+                numpy.arange(len(trainset)),
+                int(args.trunc * len(trainset)),
+                replace=False,
+            )
+        )
+        trainset = Subset(trainset, random_train_indices)
+
+        random_test_indices = list(
+            numpy.random.choice(
+                numpy.arange(len(testset)),
+                int(args.trunc * len(testset)),
+                replace=False,
+            )
+        )
+        testset = Subset(testset, random_test_indices)
+
+        logging.info(
+            "truncated train set size to %.02f%%: %d -> %d",
+            100 * args.trunc,
+            orig_train_len,
+            len(trainset),
+        )
+        logging.info(
+            "truncated test set size to %.02f%%: %d -> %d",
+            100 * args.trunc,
+            orig_test_len,
+            len(testset),
+        )
+    else:
+        logging.info(termcolor.colored("not truncating dataset", "red"))
 
 
     # setup logging with visdom
