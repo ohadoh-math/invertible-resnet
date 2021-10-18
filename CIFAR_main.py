@@ -488,6 +488,10 @@ def main():
     with open(os.path.join(args.save_dir, 'final.txt'), 'w') as f:
         f.write(str(test_objective))
 
+    model_file = os.path.join(args.save_dir, 'model.tr')
+    logging.info("saving model to file %s", model_file)
+    torch.save(model.cpu(), model_file)
+
 
 if __name__ == '__main__':
     main_tid = threading.main_thread().ident
