@@ -2,8 +2,14 @@
 set -eux
 
 coeff=${COEFF:-0.9}
+trunc=${TRUNC:-1}
 
-savedir="results/zca_clf_full_cifar10_wrn22_inj_pad_coeff_${coeff}_$(date +'%d.%m-%H%M')"
+if [ "${trunc}" -lt 1 ]
+then
+    truncated="_truncated"
+fi
+
+savedir="results/cifar_coeff_${coeff}${truncated:-}_$(date +'%d.%m-%H%M')"
 mkdir -p ${savedir}
 
 python3 ./CIFAR_main.py \
@@ -21,5 +27,5 @@ python3 ./CIFAR_main.py \
     --optimizer sgd \
     --vis_server localhost \
     --epochs ${EPOCHS:-200} \
-    --trunc ${TRUNC:-1} \
+    --trunc ${trunc} \
     --vis_port 8097 &> >(tee ${savedir}/log)

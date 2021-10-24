@@ -29,6 +29,7 @@ import json
 from models.utils_cifar import train, test, std, mean, get_hms, interpolate
 from models.conv_iResNet import conv_iResNet as iResNet
 from models.conv_iResNet import multiscale_conv_iResNet as multiscale_iResNet
+from models.designs import NoDesign
 
 parser = argparse.ArgumentParser(description='Train i-ResNet/ResNet on Cifar')
 parser.add_argument('-densityEstimation', '--densityEstimation', dest='densityEstimation',
@@ -79,6 +80,7 @@ parser.add_argument('-log_verbose', '--log_verbose', dest='log_verbose', action=
 parser.add_argument('-deterministic', '--deterministic', dest='deterministic', action='store_true',
                     help='fix random seeds and set cuda deterministic')
 parser.add_argument('--trunc', type=float, default=1., help='Truncate the data and test sets by percentage.')
+parser.add_argument('--design', choices=['none'], default="none", help="")
 
 
 def try_make_dir(d):
@@ -350,17 +352,33 @@ def main():
         logging.info(termcolor.colored("not truncating dataset", "red"))
 
 
+    if args.design == 'none':
+        design = NoDesign(trainset)
+    else:
+        raise Exception("invalid design", args.design)
+
+
     # setup logging with visdom
     viz = visdom.Visdom(port=args.vis_port, server="http://" + args.vis_server)
     assert viz.check_connection(), "Could not make visdom"
 
     if args.deterministic:
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch,
-                                                  shuffle=True, num_workers=2, worker_init_fn=np.random.seed(1234))
+        trainloader = lambda: torch.utils.data.DataLoader(
+            design.get_dataset(),
+            batch_size=args.batch,
+            shuffle=True,
+            num_workers=2,
+            worker_init_fn=np.random.seed(1234),
+        )
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch,
                                                  shuffle=False, num_workers=2, worker_init_fn=np.random.seed(1234))
     else:
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch, shuffle=True, num_workers=2)
+        trainloader = lambda: torch.utils.data.DataLoader(
+            design.get_dataset(),
+            batch_size=args.batch,
+            shuffle=True,
+            num_workers=2,
+        )
         testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch, shuffle=False, num_workers=2)
 
     model = get_model(
@@ -383,7 +401,7 @@ def main():
     )
 
     # init actnrom parameters
-    init_batch = get_init_batch(trainloader, args.init_batch)
+    init_batch = get_init_batch(trainloader(), args.init_batch)
 
     logging.info("cuda specs")
     use_cuda = torch.cuda.is_available()
@@ -477,11 +495,14 @@ def main():
     for epoch in range(1, 1+args.epochs):
         start_time = time.time()
         logging.debug("start << training epoch %d", epoch)
-        train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, train_log)
+        train(args, model, optimizer, epoch, trainloader(), trainset, viz, use_cuda, train_log)
         logging.debug("finish >> training epoch %d", epoch)
         epoch_time = time.time() - start_time
         elapsed_time += epoch_time
         logging.info('| Elapsed time : %d:%02d:%02d' % (get_hms(elapsed_time)))
+        logging.debug("start << updating design for epoch %d", epoch)
+        design.update_design(model)
+        logging.debug("finish >> updating design for epoch %d", epoch)
 
     logging.info('Testing model')
     test_log = open(os.path.join(args.save_dir, "test_log.txt"), 'w')

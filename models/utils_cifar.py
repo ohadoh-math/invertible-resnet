@@ -258,7 +258,7 @@ def test(best_result, args, model, epoch, testloader, viz, use_cuda, test_log):
         try_make_dir(args.save_dir)
         torch.save(state, os.path.join(args.save_dir, 'checkpoint.t7'))
         best_result = objective
-        (Path(args.save_dir)/'accuracy.json').wirte_text(json.dumps({"accuracy": objective}, indent=4))
+        (Path(args.save_dir)/'accuracy.json').write_text(json.dumps({"accuracy": objective}, indent=4))
     else:
         logging.info('\n| Not best... {:.4f} < {:.4f}'.format(objective, best_result))
 
