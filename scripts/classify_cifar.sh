@@ -26,6 +26,8 @@ python3 ./CIFAR_main.py \
     --nonlin elu \
     --optimizer sgd \
     --vis_server localhost \
-    --epochs ${EPOCHS:-200} \
+    --design-epochs ${DESIGN_EPOCHS:-10} \
+    --train-epochs ${TRAIN_EPOCHS:-20} \
     --trunc ${trunc} \
+    --design ${DESIGN:-none} \
     --vis_port 8097 &> >(tee ${savedir}/log)

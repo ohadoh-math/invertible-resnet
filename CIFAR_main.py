@@ -29,7 +29,7 @@ import json
 from models.utils_cifar import train, test, std, mean, get_hms, interpolate
 from models.conv_iResNet import conv_iResNet as iResNet
 from models.conv_iResNet import multiscale_conv_iResNet as multiscale_iResNet
-from models.designs import NoDesign
+from models.designs import NoDesign, UniformDesign
 
 parser = argparse.ArgumentParser(description='Train i-ResNet/ResNet on Cifar')
 parser.add_argument('-densityEstimation', '--densityEstimation', dest='densityEstimation',
@@ -47,7 +47,9 @@ parser.add_argument('--init_batch', default=1024, type=int, help='init batch siz
 parser.add_argument('--init_ds', default=2, type=int, help='initial downsampling')
 parser.add_argument('--warmup_epochs', default=10, type=int, help='epochs for warmup')
 parser.add_argument('--inj_pad', default=0, type=int, help='initial inj padding')
-parser.add_argument('--epochs', default=200, type=int, help='number of epochs')
+parser.add_argument('--design-epochs', default=10, type=int, help="Number of epochs where the design is updated.")
+parser.add_argument('--train-epochs', default=20, type=int, help="For a given design, the number of epochs before updating the design.")
+#parser.add_argument('--epochs', default=200, type=int, help='number of epochs')
 parser.add_argument('--nBlocks', nargs='+', type=int, default=[4, 4, 4])
 parser.add_argument('--nStrides', nargs='+', type=int, default=[1, 2, 2])
 parser.add_argument('--nChannels', nargs='+', type=int, default=[16, 64, 256])
@@ -80,7 +82,9 @@ parser.add_argument('-log_verbose', '--log_verbose', dest='log_verbose', action=
 parser.add_argument('-deterministic', '--deterministic', dest='deterministic', action='store_true',
                     help='fix random seeds and set cuda deterministic')
 parser.add_argument('--trunc', type=float, default=1., help='Truncate the data and test sets by percentage.')
-parser.add_argument('--design', choices=['none'], default="none", help="")
+parser.add_argument('--design', choices=['none', 'uniform'], default="none", help="Experimental design method.")
+parser.add_argument('--design-batch-size', type=int, default=20, help="By what size to increase label count in each step.")
+parser.add_argument('--no-update', action='store_true', help="Don't update the design after the first update.")
 
 
 def try_make_dir(d):
@@ -354,6 +358,8 @@ def main():
 
     if args.design == 'none':
         design = NoDesign(trainset)
+    elif args.design == 'uniform':
+        design = UniformDesign(trainset, args.design_batch_size, not args.no_update)
     else:
         raise Exception("invalid design", args.design)
 
@@ -471,7 +477,8 @@ def main():
         test(best_objective, args, model, start_epoch, testloader, viz, use_cuda, test_log)
         return
 
-    logging.info('|  Train Epochs: ' + str(args.epochs))
+    epochs = args.design_epochs * args.train_epochs
+    logging.info('|  Train Epochs: ' + str(epochs))
     logging.info('|  Initial Learning Rate: ' + str(args.lr))
 
     elapsed_time = 0
@@ -492,7 +499,7 @@ def main():
     train_log = open(os.path.join(args.save_dir, "train_log.txt"), 'w')
 
     logging.info("TRAINING!")
-    for epoch in range(1, 1+args.epochs):
+    for epoch in range(1, epochs):
         start_time = time.time()
         logging.debug("start << training epoch %d", epoch)
         train(args, model, optimizer, epoch, trainloader(), trainset, viz, use_cuda, train_log)
@@ -500,9 +507,15 @@ def main():
         epoch_time = time.time() - start_time
         elapsed_time += epoch_time
         logging.info('| Elapsed time : %d:%02d:%02d' % (get_hms(elapsed_time)))
-        logging.debug("start << updating design for epoch %d", epoch)
-        design.update_design(model)
-        logging.debug("finish >> updating design for epoch %d", epoch)
+
+        if epoch > 0 and epoch % args.train_epochs == 0:
+            # after every `args.train_epochs` epochs update the design.
+            # NOTE: since the epoch counting starts at `1` and not at `0` this doesn't happen on the first
+            # iteration. however, to be on the safe side for future changes the condition includes
+            # `epoch > 0`.
+            logging.debug("start << updating design for epoch %d", epoch)
+            design.update_design(model)
+            logging.debug("finish >> updating design for epoch %d", epoch)
 
     logging.info('Testing model')
     test_log = open(os.path.join(args.save_dir, "test_log.txt"), 'w')

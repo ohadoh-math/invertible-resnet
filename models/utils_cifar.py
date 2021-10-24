@@ -80,6 +80,7 @@ def try_make_dir(d):
 
 
 def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, train_log):
+    epochs = args.design_epochs * args.train_epochs
     model.train()
     correct = 0
     total = 0
@@ -139,7 +140,7 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
                 mean_logpz = logpz.mean().item()
                 #sys.stdout.write('\r')
                 logging.info('| Epoch [%3d/%3d] Iter[%3d/%3d]\t\t%% bits/dim: %.3f Trace: %.3f  logp(z) %.3f'
-                                 % (epoch, args.epochs, batch_idx+1,
+                                 % (epoch, epochs, batch_idx+1,
                                     (len(trainset)//args.batch)+1, loss,  mean_trace, mean_logpz))
                 #sys.stdout.flush()
                 line_plot(viz, "bits/dim", cur_iter, loss.item())
@@ -188,7 +189,7 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
             if batch_idx % 1 == 0:
                 #sys.stdout.write('\r')
                 logging.info('| Epoch [%3d/%3d] Iter[%3d/%3d]\t\tLoss: %.4f Acc@1: %.3f'
-                                 % (epoch, args.epochs, batch_idx+1,
+                                 % (epoch, epochs, batch_idx+1,
                                     (len(trainset)//args.batch)+1, loss.data.item(),
                                     100.*correct.type(torch.FloatTensor)/float(total)))
                 #sys.stdout.flush()
