@@ -11,6 +11,7 @@ import sys
 import math
 import numpy as np
 import json
+from pathlib import Path
 import pdb
 
 import time
@@ -97,41 +98,28 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
     for batch_idx, (inputs, targets) in enumerate(trainloader):
         logging.info("epoch = %d, batch index = %d/%d", epoch, batch_idx, len(trainloader)) 
         cur_iter = (epoch - 1) * len(trainloader) + batch_idx
-        #logging.debug("debug marker")
         # if first epoch use warmup
         if epoch - 1 <= args.warmup_epochs:
             this_lr = args.lr * float(cur_iter) / (args.warmup_epochs * len(trainloader))
             update_lr(optimizer, this_lr)
 
-        #logging.debug("debug marker")
         if use_cuda:
             inputs, targets = inputs.cuda(), targets.cuda()  # GPU settings
         optimizer.zero_grad()
         
-        #logging.debug("debug marker")
         #inputs, targets = Variable(inputs, requires_grad=True), Variable(targets)
         
 
-        #logging.debug("debug marker")
         if args.densityEstimation: # density estimation
-            #logging.debug("debug marker")
             _, logpz, trace = model(inputs)  # Forward Propagation
-            #logging.debug("debug marker")
             # compute loss
             logpx = logpz + trace
-            #logging.debug("debug marker")
             loss = bits_per_dim(logpx, inputs).mean()
-            #logging.debug("debug marker")
         else: # classification
-            #logging.debug("debug marker")
             out, _ = model(inputs)
-            #logging.debug("debug marker")
             loss = criterion(out, targets) # Loss
-            #logging.debug("debug marker")
-        #logging.debug("debug marker")
         
         # logging for sigmas. NOTE: needs to be done before backward-call
-        #logging.debug("debug marker")
         if args.densityEstimation and args.log_verbose:
             if batch_idx % args.log_every == 0:
                 sigmas = []
@@ -142,27 +130,24 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
                 sigmas = np.array(sigmas)
                 line_plot(viz, "sigma all layers", cur_iter, sigmas)
                 
-        #logging.debug("debug marker")
         loss.backward()  # Backward Propagation
         optimizer.step()  # Optimizer update
                 
-        #logging.debug("debug marker")
         if args.densityEstimation: # logging for density estimation
-            logging.debug("debug marker")
             if batch_idx % args.log_every == 0:
                 mean_trace = trace.mean().item()
                 mean_logpz = logpz.mean().item()
-                sys.stdout.write('\r')
-                sys.stdout.write('| Epoch [%3d/%3d] Iter[%3d/%3d]\t\t%% bits/dim: %.3f Trace: %.3f  logp(z) %.3f'
+                #sys.stdout.write('\r')
+                logging.info('| Epoch [%3d/%3d] Iter[%3d/%3d]\t\t%% bits/dim: %.3f Trace: %.3f  logp(z) %.3f'
                                  % (epoch, args.epochs, batch_idx+1,
                                     (len(trainset)//args.batch)+1, loss,  mean_trace, mean_logpz))
-                sys.stdout.flush()
+                #sys.stdout.flush()
                 line_plot(viz, "bits/dim", cur_iter, loss.item())
                 line_plot(viz, "logp(z)", cur_iter, mean_logpz)
                 line_plot(viz, "log|df/dz|", cur_iter, mean_trace)
                 # file logging
                 log_dict = {"iter": cur_iter, "loss": loss.item(), "logpz": mean_logpz, "logdet": mean_trace, "epoch": epoch}
-                train_log.write("{}\n".format(json.dumps(log_dict)))
+                train_log.write("{}\n".format(json.dumps(log_dict, indent=4)))
                 train_log.flush()
 
                 if args.log_verbose:
@@ -197,18 +182,16 @@ def train(args, model, optimizer, epoch, trainloader, trainset, viz, use_cuda, t
                         line_plot(viz, "min prior scale", cur_iter, prior_scales_min.item())  
 
         else: # logging for classification
-            #logging.debug("debug marker")
             _, predicted = torch.max(out.data, 1)
             total += targets.size(0)
             correct += predicted.eq(targets.data).cpu().sum()    
             if batch_idx % 1 == 0:
-                sys.stdout.write('\r')
-                sys.stdout.write('| Epoch [%3d/%3d] Iter[%3d/%3d]\t\tLoss: %.4f Acc@1: %.3f'
+                #sys.stdout.write('\r')
+                logging.info('| Epoch [%3d/%3d] Iter[%3d/%3d]\t\tLoss: %.4f Acc@1: %.3f'
                                  % (epoch, args.epochs, batch_idx+1,
                                     (len(trainset)//args.batch)+1, loss.data.item(),
                                     100.*correct.type(torch.FloatTensor)/float(total)))
-                sys.stdout.flush()
-        #logging.debug("debug marker")
+                #sys.stdout.flush()
 
 
 def test(best_result, args, model, epoch, testloader, viz, use_cuda, test_log):
@@ -275,6 +258,7 @@ def test(best_result, args, model, epoch, testloader, viz, use_cuda, test_log):
         try_make_dir(args.save_dir)
         torch.save(state, os.path.join(args.save_dir, 'checkpoint.t7'))
         best_result = objective
+        (Path(args.save_dir)/'accuracy.json').wirte_text(json.dumps({"accuracy": objective}, indent=4))
     else:
         logging.info('\n| Not best... {:.4f} < {:.4f}'.format(objective, best_result))
 

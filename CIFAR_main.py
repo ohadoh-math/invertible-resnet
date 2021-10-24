@@ -398,6 +398,8 @@ def main():
 
     save_data(METADATA_DIR/"init-batch.h5", init_batch=init_batch)
     with torch.no_grad():
+        # there is some wierd exception going on here in our setup.
+        # calling `model` the frist time raises that error and the next time it seems fine.
         with contextlib.suppress(Exception):
             model(init_batch)
 
@@ -466,8 +468,8 @@ def main():
         optimizer = optim.SGD(model.parameters(), lr=args.lr,
                               momentum=0.9, weight_decay=args.weight_decay, nesterov=args.nesterov)
 
-    with open(os.path.join(args.save_dir, 'params.txt'), 'w') as f:
-        f.write(json.dumps(args.__dict__))
+    with open(os.path.join(args.save_dir, 'params.json'), 'w') as f:
+        f.write(json.dumps(args.__dict__, indent=4))
 
     train_log = open(os.path.join(args.save_dir, "train_log.txt"), 'w')
 
