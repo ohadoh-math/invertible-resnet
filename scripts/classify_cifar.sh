@@ -30,4 +30,5 @@ python3 ./CIFAR_main.py \
     --train-epochs ${TRAIN_EPOCHS:-20} \
     --trunc ${trunc} \
     --design ${DESIGN:-none} \
+    --design-batch-size ${DESIGN_BATCH_SIZE:-20} \
     --vis_port 8097 &> >(tee ${savedir}/log)

@@ -9,7 +9,7 @@ import numpy
 import torch
 import torchvision
 from torchvision import transforms
-from  torch.utils.data import DataLoader
+from  torch.utils.data import DataLoader, Subset
 from  torch.utils.data.dataloader import default_collate
 from .design import Design, Module, Dataset
 from .k_centers_greedy_acquisition import KCenterGreedyAcquisitionLowRank
@@ -22,7 +22,7 @@ def flattening_collate(data_entries):
 class CoresetDesignKCentersGreedy(Design):
     """
     A design that extracts a core-set from the dataset.
-    The algorithm used is algorithm 1 ("k-Center Greedy") in the cited paper.
+    The algorithm used is algorithm 1 ("k-Centers Greedy") in the cited paper.
     """
 
     def __init__(self, dataset: Dataset, design_size: int):
@@ -37,6 +37,7 @@ class CoresetDesignKCentersGreedy(Design):
         )
         self._index_count = 0
         self._design_ds = None
+        self._indices = []
 
         self._do_design()
 
@@ -70,7 +71,7 @@ class CoresetDesignKCentersGreedy(Design):
 
     def _do_design(self):
         """
-        Pick a covering set according to the algorithm 1 ("k-Center Greedy").
+        Pick a covering set according to the algorithm 1 ("k-Centers Greedy").
         """
         # load the data into one giant matrix
         n = len(self._dataset)
@@ -86,13 +87,13 @@ class CoresetDesignKCentersGreedy(Design):
         logging.info("X[last] = %r", X[len(X)-1])
 
         k_center_finder = KCenterGreedyAcquisitionLowRank(X)
-        design_set = [
+        self._indices = [
             k_center_finder.next()
             for _ in range(self._design_size)
         ]
 
-        logging.info("design set = %r", design_set)
-        assert False
+        logging.info("design set = %r", self._indices)
+        self._design_ds = Subset(self._dataset, self._indices)
 
 
 def _main():

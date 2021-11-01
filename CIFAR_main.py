@@ -29,7 +29,7 @@ import json
 from models.utils_cifar import train, test, std, mean, get_hms, interpolate
 from models.conv_iResNet import conv_iResNet as iResNet
 from models.conv_iResNet import multiscale_conv_iResNet as multiscale_iResNet
-from models.designs import NoDesign, UniformDesign
+from models.designs import NoDesign, UniformDesign, CoresetDesignKCentersGreedy
 
 parser = argparse.ArgumentParser(description='Train i-ResNet/ResNet on Cifar')
 parser.add_argument('-densityEstimation', '--densityEstimation', dest='densityEstimation',
@@ -82,7 +82,7 @@ parser.add_argument('-log_verbose', '--log_verbose', dest='log_verbose', action=
 parser.add_argument('-deterministic', '--deterministic', dest='deterministic', action='store_true',
                     help='fix random seeds and set cuda deterministic')
 parser.add_argument('--trunc', type=float, default=1., help='Truncate the data and test sets by percentage.')
-parser.add_argument('--design', choices=['none', 'uniform'], default="none", help="Experimental design method.")
+parser.add_argument('--design', choices=['none', 'uniform', 'k-centers'], default="none", help="Experimental design method.")
 parser.add_argument('--design-batch-size', type=int, default=20, help="By what size to increase label count in each step.")
 parser.add_argument('--no-update', action='store_true', help="Don't update the design after the first update.")
 
@@ -357,12 +357,16 @@ def main():
 
 
     if args.design == 'none':
+        logging.info("no design")
         design = NoDesign(trainset)
     elif args.design == 'uniform':
+        logging.info("uniform design")
         design = UniformDesign(trainset, args.design_batch_size, not args.no_update)
+    elif args.design == 'k-centers':
+        logging.info("k-centers design")
+        design = CoresetDesignKCentersGreedy(trainset, args.design_batch_size)
     else:
         raise Exception("invalid design", args.design)
-
 
     # setup logging with visdom
     viz = visdom.Visdom(port=args.vis_port, server="http://" + args.vis_server)
@@ -498,11 +502,12 @@ def main():
 
     train_log = open(os.path.join(args.save_dir, "train_log.txt"), 'w')
 
+    logging.error("design ds size = %r", len(design.dataset))
     logging.info("TRAINING!")
     for epoch in range(1, epochs):
         start_time = time.time()
         logging.debug("start << training epoch %d", epoch)
-        train(args, model, optimizer, epoch, trainloader(), trainset, viz, use_cuda, train_log)
+        train(args, model, optimizer, epoch, trainloader(), design.dataset, viz, use_cuda, train_log)
         logging.debug("finish >> training epoch %d", epoch)
         epoch_time = time.time() - start_time
         elapsed_time += epoch_time
