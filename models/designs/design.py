@@ -26,3 +26,7 @@ class Design(abc.ABC):
         Update the design with the new version of the trained model
         """
         ...
+
+    @property
+    def dataset(self) -> Dataset:
+        return self.get_dataset()
