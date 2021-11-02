@@ -26,11 +26,15 @@ mean = {
     'cifar10': (0.4914, 0.4822, 0.4465),
     'cifar100': (0.5071, 0.4867, 0.4408),
 }
+mean['cifar3'] = mean['cifar10']
+mean['cifar5'] = mean['cifar10']
 
 std = {
     'cifar10': (0.2023, 0.1994, 0.2010),
     'cifar100': (0.2675, 0.2565, 0.2761),
 }
+std['cifar3'] = std['cifar10']
+std['cifar5'] = std['cifar10']
 
 # Only for cifar-10
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')

@@ -298,12 +298,34 @@ def main():
             transform_test = transforms.Compose(test_chain + clf_chain)
 
 
-        if args.dataset == 'cifar10':
+        if args.dataset in ['cifar3', 'cifar5', 'cifar10']:
             trainset = torchvision.datasets.CIFAR10(
                 root='./data', train=True, download=True, transform=transform_train)
             testset = torchvision.datasets.CIFAR10(
                 root='./data', train=False, download=True, transform=transform_test)
-            args.nClasses = 10
+
+            if args.dataset == 'cifar10':
+                args.nClasses = 10
+            else:
+                nclasses = 3 if args.dataset == 'cifar3' else 5
+                args.nClasses = nclasses
+
+                logging.info("filtering classes 0..%d", nclasses)
+
+                train_subset_indices = []
+                cursor = 0
+                for _batch, labels in torch.utils.data.DataLoader(trainset, args.batch):
+                    train_subset_indices += list((labels < nclasses).nonzero().flatten() + cursor)
+                    cursor += len(labels)
+                trainset = Subset(trainset, train_subset_indices)
+
+                test_subset_indices = []
+                cursor = 0
+                for _batch, labels in torch.utils.data.DataLoader(testset, args.batch):
+                    test_subset_indices += list((labels < nclasses).nonzero().flatten() + cursor)
+                    cursor += len(labels)
+                testset = Subset(testset, test_subset_indices)
+
         elif args.dataset == 'cifar100':
             trainset = torchvision.datasets.CIFAR100(
                 root='./data', train=True, download=True, transform=transform_train)
@@ -510,6 +532,7 @@ def main():
     for epoch in range(1, epochs):
         start_time = time.time()
         logging.debug("start << training epoch %d", epoch)
+        logging.debug("trainloader = %r", trainloader)
         train(args, model, optimizer, epoch, trainloader(), design.dataset, viz, use_cuda, train_log)
         logging.debug("finish >> training epoch %d", epoch)
         epoch_time = time.time() - start_time
