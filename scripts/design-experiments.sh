@@ -12,7 +12,7 @@ cd ${REPO_BASE}
 
 for coeff in 0.{5..9}
 do
-    for design in "uniform" "k-centers"
+    for design in "k-centers" "uniform"
     do
         for iter in $(seq 1 ${ITERATIONS:-5})
         do
@@ -41,3 +41,5 @@ do
         done
     done
 done
+
+"${REPO_BASE}/design-experiments-digest.py" -o "${output_dir}/accuracy-graph.png" "${output_dir}"

@@ -25,9 +25,10 @@ class CoresetDesignKCentersGreedy(Design):
     The algorithm used is algorithm 1 ("k-Centers Greedy") in the cited paper.
     """
 
-    def __init__(self, dataset: Dataset, design_size: int):
+    def __init__(self, dataset: Dataset, design_size: int, randomize: bool):
         self._dataset = dataset
         self._design_size = design_size
+        self._randomize = randomize
         self._indices = numpy.arange(len(self._dataset))
         self._loader = torch.utils.data.DataLoader(
             dataset,
@@ -86,7 +87,7 @@ class CoresetDesignKCentersGreedy(Design):
         logging.info("X[0] = %r", X[0])
         logging.info("X[last] = %r", X[len(X)-1])
 
-        k_center_finder = KCenterGreedyAcquisitionLowRank(X)
+        k_center_finder = KCenterGreedyAcquisitionLowRank(X.cpu().numpy(), self._randomize)
         self._indices = [
             k_center_finder.next()
             for _ in range(self._design_size)

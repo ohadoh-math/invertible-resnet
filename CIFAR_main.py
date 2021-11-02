@@ -82,7 +82,7 @@ parser.add_argument('-log_verbose', '--log_verbose', dest='log_verbose', action=
 parser.add_argument('-deterministic', '--deterministic', dest='deterministic', action='store_true',
                     help='fix random seeds and set cuda deterministic')
 parser.add_argument('--trunc', type=float, default=1., help='Truncate the data and test sets by percentage.')
-parser.add_argument('--design', choices=['none', 'uniform', 'k-centers'], default="none", help="Experimental design method.")
+parser.add_argument('--design', choices=['none', 'uniform', 'k-centers', 'k-centers-det'], default="none", help="Experimental design method.")
 parser.add_argument('--design-batch-size', type=int, default=20, help="By what size to increase label count in each step.")
 parser.add_argument('--no-update', action='store_true', help="Don't update the design after the first update.")
 
@@ -249,7 +249,7 @@ def main():
     assert 0. < args.trunc, Exception("Can't truncate with negative percentage", args.trunc)
 
     logging.basicConfig(
-        format="%(asctime)s (pid=%(process)d:tid=%(thread)d) [%(levelname)s:%(funcName)s:%(filename)s:%(lineno)d] %(message)s",
+        format=f"%(asctime)s (design={args.design}) [%(levelname)s:%(funcName)s:%(filename)s:%(lineno)d] %(message)s",
         level=logging.DEBUG,
     )
 
@@ -364,7 +364,10 @@ def main():
         design = UniformDesign(trainset, args.design_batch_size, not args.no_update)
     elif args.design == 'k-centers':
         logging.info("k-centers design")
-        design = CoresetDesignKCentersGreedy(trainset, args.design_batch_size)
+        design = CoresetDesignKCentersGreedy(trainset, args.design_batch_size, True)
+    elif args.design == 'k-centers-det':
+        logging.info("k-centers design (deterministic)")
+        design = CoresetDesignKCentersGreedy(trainset, args.design_batch_size, False)
     else:
         raise Exception("invalid design", args.design)
 
