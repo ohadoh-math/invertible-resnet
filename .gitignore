@@ -108,3 +108,4 @@ log
 *.swp
 data/
 results/
+design-experiments/

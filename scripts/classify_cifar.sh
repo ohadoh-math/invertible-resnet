@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
+
 set -eux
 
+output_dir=${OUTPUT_DIR:-results}
 coeff=${COEFF:-0.9}
 trunc=${TRUNC:-1}
 
@@ -9,7 +11,7 @@ then
     truncated="_truncated"
 fi
 
-savedir="results/cifar_coeff_${coeff}${truncated:-}_$(date +'%d.%m-%H%M')"
+savedir="${output_dir}/cifar_coeff_${coeff}${truncated:-}_$(date +'%d.%m-%H%M')"
 mkdir -p ${savedir}
 
 python3 ./CIFAR_main.py \
