@@ -109,3 +109,6 @@ log
 data/
 results/
 design-experiments/
+
+
+models/designs/k_centers_greedy_acquisition.py
